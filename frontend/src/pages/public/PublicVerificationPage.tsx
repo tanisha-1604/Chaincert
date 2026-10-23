@@ -59,7 +59,9 @@ export const PublicVerificationPage: React.FC = () => {
     setIsVerifying(true);
     try {
       const res = await verificationService.verifyUploadedFile(selectedFile);
-      navigate(`/verify/result?id=${encodeURIComponent(res.certificateId)}&channel=DOCUMENT_UPLOAD`);
+      navigate(`/verify/result?id=${encodeURIComponent(res.certificateId)}&channel=DOCUMENT_UPLOAD`, {
+        state: { verificationResult: res },
+      });
     } finally {
       setIsVerifying(false);
     }

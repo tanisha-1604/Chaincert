@@ -92,19 +92,98 @@ def upload_too_large(_error):
     return jsonify({"success": False, "error": "Upload exceeds the 10 MB limit."}), 413
 
 _ALLOWED_ORIGINS = {origin.strip() for origin in os.environ.get(
-    "CHAINCERT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    "CHAINCERT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175"
 ).split(",") if origin.strip()}
 
 @app.after_request
 def add_api_cors_headers(response):
     origin = request.headers.get("Origin")
-    if request.path.startswith("/api/") and origin and (origin in _ALLOWED_ORIGINS or "*" in _ALLOWED_ORIGINS):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Vary"] = "Origin"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Max-Age"] = "600"
+    if request.path.startswith("/api/") and origin:
+        is_allowed = (
+            origin in _ALLOWED_ORIGINS
+            or "*" in _ALLOWED_ORIGINS
+            or origin.startswith("http://localhost:")
+            or origin.startswith("http://127.0.0.1:")
+        )
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+            response.headers["Access-Control-Max-Age"] = "600"
     return response
+
+
+def ensure_default_accounts():
+    """Ensure baseline accounts and institutions exist in access_control.db if empty."""
+    try:
+        from chaincert.auth import Role
+        access = app.extensions["chaincert_services"]["access"]
+        with access.store.connect() as con:
+            user_count = con.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
+            if user_count > 0:
+                return
+            inst_row = con.execute("SELECT id FROM institutions WHERE name='MMCOE'").fetchone()
+            inst_id = inst_row["id"] if inst_row else access.create_institution("MMCOE")
+
+        # Initial platform admin bootstrap
+        access.provision_user(
+            email="demo.admin@chaincert.local",
+            display_name="ChainCert Demo Admin",
+            password="ChainCertDemo!2026",
+            role=Role.PLATFORM_ADMIN,
+            institution_id=None,
+        )
+        token = access.login("demo.admin@chaincert.local", "ChainCertDemo!2026")
+        actor = access.authenticate(token)
+
+        # Baseline accounts documented in README & DEMO_RUNBOOK
+        access.provision_user(
+            email="institute@chaincert.local",
+            display_name="MMCOE Registrar",
+            password="Institute12345",
+            role=Role.INSTITUTION_ADMIN,
+            institution_id=inst_id,
+            actor=actor,
+        )
+        access.provision_user(
+            email="issuer@chaincert.local",
+            display_name="Demo Issuer",
+            password="IssuerDemo!2026",
+            role=Role.INSTITUTION_ADMIN,
+            institution_id=inst_id,
+            actor=actor,
+        )
+        access.provision_user(
+            email="student@chaincert.local",
+            display_name="Demo Student",
+            password="Student123456",
+            role=Role.STUDENT,
+            institution_id=inst_id,
+            actor=actor,
+        )
+        access.provision_user(
+            email="student@mmcoe.local",
+            display_name="Demo Student",
+            password="Student123456",
+            role=Role.STUDENT,
+            institution_id=inst_id,
+            actor=actor,
+        )
+        access.provision_user(
+            email="alice@chaincert.local",
+            display_name="Alice Example",
+            password="AliceExample123",
+            role=Role.STUDENT,
+            institution_id=inst_id,
+            actor=actor,
+        )
+        access.logout(token)
+    except Exception as exc:
+        app.logger.warning("ensure_default_accounts skipped: %s", exc)
+
+ensure_default_accounts()
+
 
 
 def ensure_sample_certificates():

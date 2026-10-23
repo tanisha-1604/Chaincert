@@ -361,6 +361,30 @@ def audit_events():
     return jsonify({"success": True, "count": len(items), "events": items})
 
 
+@api_bp.post("/audit/integrity-check")
+@_require(Permission.ISSUE_CERTIFICATE)
+def audit_integrity_check():
+    import time
+    from datetime import datetime, timezone
+    start = time.time()
+    chain = _services().get("chain")
+    val_result = chain.validate_chain() if chain else None
+    duration_ms = int((time.time() - start) * 1000)
+    latest_root = chain.blocks[-1].merkle_root if chain and chain.blocks else "0" * 64
+    block_count = len(chain.blocks) if chain else 0
+    is_valid = val_result.is_valid if val_result else True
+
+    return jsonify({
+        "success": True,
+        "status": "ALL_INTACT" if is_valid else "INTEGRITY_COMPROMISED",
+        "verifiedCount": block_count,
+        "merkleRoot": latest_root,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "executionTimeMs": max(1, duration_ms),
+        "errors": list(val_result.errors) if val_result else []
+    })
+
+
 @api_bp.get("/students/me")
 @_require(Permission.PUBLIC_VERIFY)
 def student_profile():

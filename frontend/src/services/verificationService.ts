@@ -1,4 +1,4 @@
-import { VerificationResult, VerificationState } from '../types';
+import { VerificationResult, VerificationState, VerificationCheck } from '../types';
 import { API_BASE_URL } from './apiConfig';
 
 // ---------------------------------------------------------------------------
@@ -18,15 +18,18 @@ interface BackendVerifyResponse {
     issue_date?: string;
     institution_id?: string;
   };
-  checks?: { name: string; passed: boolean; detail?: string }[];
+  checks?: Record<string, unknown> | Array<{ name: string; passed: boolean; detail?: string }>;
+  submitted_fingerprint?: string | null;
+  trusted_fingerprint?: string | null;
   sha256?: string;
   merkle_root?: string;
   mismatched_fields?: string[];
   extraction?: Record<string, unknown>;
+  integrity_details?: Record<string, unknown>;
 }
 
 function mapState(status: string): VerificationState {
-  switch (status.toUpperCase()) {
+  switch ((status || '').toUpperCase()) {
     case 'GENUINE': return 'GENUINE';
     case 'TAMPERED': return 'TAMPERED';
     case 'REVOKED': return 'REVOKED';
@@ -35,66 +38,31 @@ function mapState(status: string): VerificationState {
   }
 }
 
-function buildResult(data: BackendVerifyResponse, channel: VerificationResult['channel']): VerificationResult {
-  const state = mapState(data.status);
-  const certId = data.certificate_id || data.certificate?.certificate_id || 'UNKNOWN';
-
-  const summaryMap: Record<VerificationState, string> = {
-    GENUINE: 'This credential is registered with the issuing institution and details match the trusted record.',
-    TAMPERED: 'The submitted credential does not match the trusted record. Field mismatch detected.',
-    REVOKED: 'This credential was previously registered but has been revoked by the issuing institution.',
-    REVIEW_REQUIRED: 'The credential could not be conclusively verified automatically and requires further review.',
-    NOT_FOUND: 'No matching credential record was found.',
-  };
-
-  const checks = data.checks
-    ? data.checks.map(c => ({ name: c.name, passed: c.passed, message: c.detail ?? '' }))
-    : buildDefaultChecks(state, data.mismatched_fields ?? []);
-
-  const result: VerificationResult = {
-    state,
-    certificateId: certId,
-    timestamp: new Date().toISOString(),
-    summaryMessage: summaryMap[state],
-    detailedMessage: data.explanation ?? summaryMap[state],
-    checks,
-    channel,
-  };
-
-  if (data.certificate && (state === 'GENUINE' || state === 'REVOKED')) {
-    const c = data.certificate;
-    result.credential = {
-      id: c.certificate_id,
-      studentName: c.student_name ?? '',
-      studentRoll: c.roll_number ?? '',
-      course: c.course ?? '',
-      degreeType: 'Academic Degree',
-      institution: c.institution_id ?? '',
-      institutionId: c.institution_id ?? '',
-      issueDate: c.issue_date ?? '',
-      batch: '',
-      grade: '',
-      cgpa: c.cgpa,
-      status: state === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
-      sha256Hash: data.sha256 ?? '',
-      merkleRoot: data.merkle_root ?? '',
-    };
+function parseChecks(checksData: unknown, state: VerificationState, mismatchedFields: string[]): VerificationCheck[] {
+  if (Array.isArray(checksData)) {
+    return checksData.map(c => ({
+      name: c.name || 'Check',
+      passed: Boolean(c.passed),
+      message: c.detail || c.message || (c.passed ? 'Check verified' : 'Check failed'),
+    }));
   }
-
-  if (data.sha256 || data.merkle_root) {
-    result.integrityProof = {
-      sha256: data.sha256 ?? '',
-      merkleRoot: data.merkle_root ?? '',
-      batchId: '',
-      leafIndex: 0,
-    };
+  if (checksData && typeof checksData === 'object') {
+    const list: VerificationCheck[] = Object.entries(checksData as Record<string, unknown>).map(([key, val]) => {
+      const name = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const passed = Boolean(val);
+      return {
+        name,
+        passed,
+        message: passed ? 'Passed' : 'Failed or not satisfied',
+      };
+    });
+    if (list.length > 0) return list;
   }
-
-  return result;
+  return buildDefaultChecks(state, mismatchedFields);
 }
 
-function buildDefaultChecks(state: VerificationState, mismatchedFields: string[]) {
-  const checks = [];
+function buildDefaultChecks(state: VerificationState, mismatchedFields: string[]): VerificationCheck[] {
+  const checks: VerificationCheck[] = [];
   if (state === 'GENUINE') {
     checks.push(
       { name: 'Registry Lookup', passed: true, message: 'Record found in institutional registry' },
@@ -123,6 +91,73 @@ function buildDefaultChecks(state: VerificationState, mismatchedFields: string[]
   return checks;
 }
 
+function buildResult(data: BackendVerifyResponse, channel: VerificationResult['channel']): VerificationResult {
+  const state = mapState(data.status);
+  const certId = data.certificate_id || data.certificate?.certificate_id || 'UNKNOWN';
+
+  const summaryMap: Record<VerificationState, string> = {
+    GENUINE: 'This credential is registered with the issuing institution and details match the trusted record.',
+    TAMPERED: 'The submitted credential does not match the trusted record. Field mismatch detected.',
+    REVOKED: 'This credential was previously registered but has been revoked by the issuing institution.',
+    REVIEW_REQUIRED: 'The credential could not be conclusively verified automatically and requires further review.',
+    NOT_FOUND: 'No matching credential record was found.',
+  };
+
+  const checks = parseChecks(data.checks, state, data.mismatched_fields ?? []);
+
+  const sha256 =
+    data.submitted_fingerprint ||
+    data.trusted_fingerprint ||
+    data.sha256 ||
+    '';
+
+  const merkleRoot =
+    (data.integrity_details?.merkle_root as string) ||
+    data.merkle_root ||
+    '';
+
+  const result: VerificationResult = {
+    state,
+    certificateId: certId,
+    timestamp: new Date().toISOString(),
+    summaryMessage: summaryMap[state],
+    detailedMessage: data.explanation ?? summaryMap[state],
+    checks,
+    channel,
+  };
+
+  if (data.certificate && (state === 'GENUINE' || state === 'REVOKED')) {
+    const c = data.certificate;
+    result.credential = {
+      id: c.certificate_id,
+      studentName: c.student_name ?? '',
+      studentRoll: c.roll_number ?? '',
+      course: c.course ?? '',
+      degreeType: 'Academic Degree',
+      institution: c.institution_id ?? '',
+      institutionId: c.institution_id ?? '',
+      issueDate: c.issue_date ?? '',
+      batch: '',
+      grade: '',
+      cgpa: c.cgpa,
+      status: state === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
+      sha256Hash: sha256,
+      merkleRoot: merkleRoot,
+    };
+  }
+
+  if (sha256 || merkleRoot) {
+    result.integrityProof = {
+      sha256,
+      merkleRoot,
+      batchId: (data.integrity_details?.batch_id as string) || '',
+      leafIndex: 0,
+    };
+  }
+
+  return result;
+}
+
 export const verificationService = {
   async verifyById(rawId: string, channel: VerificationResult['channel'] = 'ID_LOOKUP'): Promise<VerificationResult> {
     try {
@@ -137,13 +172,53 @@ export const verificationService = {
       const data: BackendVerifyResponse = await res.json();
       return buildResult(data, channel);
     } catch (err) {
-      // Network error or backend down — fall back gracefully
       console.error('verifyById error:', err);
       return {
         state: 'NOT_FOUND',
         certificateId: rawId,
         timestamp: new Date().toISOString(),
         summaryMessage: 'Verification service unavailable. Please ensure the backend is running.',
+        detailedMessage: String(err),
+        checks: [{ name: 'Backend Connection', passed: false, message: 'Could not reach the verification service' }],
+        channel,
+      };
+    }
+  },
+
+  async verifyWithFields(
+    fields: Record<string, any>,
+    channel: VerificationResult['channel'] = 'ID_LOOKUP'
+  ): Promise<VerificationResult> {
+    const cid = fields.certificate_id || fields.id;
+    try {
+      const res = await fetch(`${API_BASE_URL}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          certificate_id: cid,
+          fields: {
+            certificate_id: cid,
+            student_name: fields.student_name || fields.studentName,
+            roll_number: fields.roll_number || fields.studentRoll,
+            course: fields.course,
+            cgpa: fields.cgpa,
+            issue_date: fields.issue_date || fields.issueDate,
+            institution_id: fields.institution_id || fields.institution || 'MMCOE',
+          },
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data: BackendVerifyResponse = await res.json();
+      return buildResult(data, channel);
+    } catch (err) {
+      console.error('verifyWithFields error:', err);
+      return {
+        state: 'NOT_FOUND',
+        certificateId: cid || 'UNKNOWN',
+        timestamp: new Date().toISOString(),
+        summaryMessage: 'Verification failed. Could not communicate with backend.',
         detailedMessage: String(err),
         checks: [{ name: 'Backend Connection', passed: false, message: 'Could not reach the verification service' }],
         channel,

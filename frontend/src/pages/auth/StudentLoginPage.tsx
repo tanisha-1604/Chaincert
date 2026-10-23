@@ -19,8 +19,9 @@ export const StudentLoginPage: React.FC = () => {
     try {
       await authService.loginStudent(identifier, password);
       navigate('/student/credentials');
-    } catch {
-      setError('Unable to authenticate. Please check your Student ID or Email.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to authenticate. Please check your Student ID or Email.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

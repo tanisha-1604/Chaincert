@@ -41,7 +41,7 @@ export const CertificatesPage: React.FC = () => {
     issueDate: new Date().toISOString().split('T')[0],
     batch: 'Class of 2024',
     grade: 'First Class with Distinction',
-    cgpa: '3.80 / 4.00'
+    cgpa: '9.80'
   });
 
   // Edit Certificate Form
@@ -482,6 +482,32 @@ export const CertificatesPage: React.FC = () => {
                     onChange={(e) => setNewCert({ ...newCert, grade: e.target.value })}
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-300 text-xs"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-primary block mb-1">
+                    CGPA / Cumulative Grade (0.00 – 10.00) <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    id="regCgpa"
+                    type="text"
+                    required
+                    placeholder="e.g. 9.80"
+                    value={newCert.cgpa}
+                    onChange={(e) => setNewCert({ ...newCert, cgpa: e.target.value })}
+                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-300 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-primary block mb-1">
+                    Issuing Authority (Bound Account)
+                  </label>
+                  <div className="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center text-slate-700 font-medium">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 mr-1.5">verified</span>
+                    <span>Authenticated Institutional Account</span>
+                  </div>
                 </div>
               </div>
 

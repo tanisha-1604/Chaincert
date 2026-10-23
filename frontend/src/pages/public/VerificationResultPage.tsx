@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { verificationService } from '../../services/verificationService';
 import { VerificationResult, VerificationState } from '../../types';
 import { VerificationBadge } from '../../components/common/VerificationBadge';
 
 export const VerificationResultPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const idParam = searchParams.get('id') || 'CC-2024-89042-ENG';
   const channelParam = (searchParams.get('channel') as any) || 'ID_LOOKUP';
 
-  const [result, setResult] = useState<VerificationResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialResult = location.state?.verificationResult as VerificationResult | undefined;
+
+  const [result, setResult] = useState<VerificationResult | null>(initialResult || null);
+  const [loading, setLoading] = useState(!initialResult);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -30,8 +33,35 @@ export const VerificationResultPage: React.FC = () => {
     }
   };
 
+  const handleSimulateTamper = async () => {
+    const cred = result?.credential;
+    const cid = cred?.id || idParam;
+    setLoading(true);
+    try {
+      const tamperedFields = {
+        certificate_id: cid,
+        student_name: cred?.studentName || 'Alice Example',
+        roll_number: cred?.studentRoll || 'DEMO-ROLL-001',
+        course: cred?.course || 'Bachelor of Technology in Artificial Intelligence',
+        cgpa: '9.99', // Altered CGPA
+        issue_date: cred?.issueDate || '2026-10-23',
+        institution_id: cred?.institutionId || cred?.institution || 'MMCOE',
+      };
+      const res = await verificationService.verifyWithFields(tamperedFields, 'ID_LOOKUP');
+      setResult(res);
+      showToast('Backend integrity check evaluated modified credential data (CGPA changed to 9.99).');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    loadVerification(idParam);
+    if (initialResult && initialResult.certificateId === idParam) {
+      setResult(initialResult);
+      setLoading(false);
+    } else {
+      loadVerification(idParam);
+    }
   }, [idParam, channelParam]);
 
   const copyShareLink = () => {
@@ -74,44 +104,36 @@ export const VerificationResultPage: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
-            onClick={() => loadVerification('CC-2024-89042-ENG')}
+            onClick={() => loadVerification(result?.certificateId && result.certificateId !== 'UNKNOWN-123' ? result.certificateId : 'DEMO-CC-2026-001')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               result.state === 'GENUINE' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
             }`}
           >
-            1. GENUINE
+            1. GENUINE (Original)
           </button>
           <button
-            onClick={() => loadVerification('CC-TAMPERED-SAMPLE')}
+            onClick={handleSimulateTamper}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               result.state === 'TAMPERED' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-700 bg-rose-50 hover:bg-rose-100'
             }`}
           >
-            2. TAMPERED
+            2. TAMPERED (Modify CGPA)
           </button>
           <button
-            onClick={() => loadVerification('CC-2024-55120-MED')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              result.state === 'REVIEW_REQUIRED' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-800 bg-amber-50 hover:bg-amber-100'
-            }`}
-          >
-            3. REVIEW_REQUIRED
-          </button>
-          <button
-            onClick={() => loadVerification('CC-UNKNOWN-RECORD')}
+            onClick={() => loadVerification('UNKNOWN-123')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               result.state === 'NOT_FOUND' ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-700 bg-slate-100 hover:bg-slate-200'
             }`}
           >
-            4. NOT_FOUND
+            3. NOT_FOUND (UNKNOWN-123)
           </button>
           <button
-            onClick={() => loadVerification('CC-2024-99211-LAW')}
+            onClick={() => loadVerification('DEMO-CC-2026-001')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               result.state === 'REVOKED' ? 'bg-rose-700 text-white shadow-xs' : 'text-rose-700 bg-rose-50 hover:bg-rose-100'
             }`}
           >
-            5. REVOKED
+            4. REVOKED Status
           </button>
         </div>
       </div>

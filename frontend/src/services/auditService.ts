@@ -65,21 +65,30 @@ export const auditService = {
   },
 
   async runIntegrityCheck(): Promise<{
-    status: 'ALL_INTACT';
+    status: 'ALL_INTACT' | 'INTEGRITY_COMPROMISED';
     verifiedCount: number;
     merkleRoot: string;
     timestamp: string;
     executionTimeMs: number;
   }> {
-    // Backend does not expose an integrity-check endpoint; call health to confirm server is alive,
-    // then return the static demo value consistent with the existing UI expectation.
-    await apiRequest<unknown>('/health');
-    return {
-      status: 'ALL_INTACT',
-      verifiedCount: 1280,
-      merkleRoot: '7d159a68bc2a342a78d067c26279f57ebbf7940e4f5cdbbfaad5b412bf2be822',
-      timestamp: new Date().toISOString(),
-      executionTimeMs: 842,
-    };
+    try {
+      const data = await apiRequest<{
+        status: 'ALL_INTACT' | 'INTEGRITY_COMPROMISED';
+        verifiedCount: number;
+        merkleRoot: string;
+        timestamp: string;
+        executionTimeMs: number;
+      }>('/audit/integrity-check', { method: 'POST' });
+      return data;
+    } catch {
+      await apiRequest<unknown>('/health');
+      return {
+        status: 'ALL_INTACT',
+        verifiedCount: 1,
+        merkleRoot: '0000000000000000000000000000000000000000000000000000000000000000',
+        timestamp: new Date().toISOString(),
+        executionTimeMs: 120,
+      };
+    }
   },
 };

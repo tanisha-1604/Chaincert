@@ -78,5 +78,55 @@
     "previous_root": "a8dce12eb7e44a54584583ed33a640fbdebd9dff853b2fabd78858c3c6cff034",
     "block_hash": "8537bde108a6738418703e025882f2528cde896a154c4155ac12d993cfeceae5",
     "chain_spec_version": "1.0"
+  },
+  {
+    "block_id": 9,
+    "batch_id": "BATCH-DEMO-CC-2026-001",
+    "timestamp": "2026-10-23T15:01:02.429235+00:00",
+    "certificate_count": 1,
+    "merkle_root": "52b853531e4a2fb60a6cf5bc68ca395e44f7ec63ac6c8bb692a5d68b9c66b839",
+    "previous_root": "8ae698a32d3ad312228328449fe4faa0aba15c88bb13d2c6704207c7112d481d",
+    "block_hash": "abec4b014ca8b94df9a30841f1bef86f94fbbff8c1953df4e835721cdc68a794",
+    "chain_spec_version": "1.0"
+  },
+  {
+    "block_id": 10,
+    "batch_id": "BATCH-DEMO-CC-2026-API-001",
+    "timestamp": "2026-10-23T15:20:39.861301+00:00",
+    "certificate_count": 1,
+    "merkle_root": "6eb945c10492cc0c405a2e1b7337938d6065b45474d3f1e568cb4671d6293f82",
+    "previous_root": "52b853531e4a2fb60a6cf5bc68ca395e44f7ec63ac6c8bb692a5d68b9c66b839",
+    "block_hash": "8ebd488576e1da601f0adb3fed99976c59f0539e9a3127dcc1f9ce6cbade48ec",
+    "chain_spec_version": "1.0"
+  },
+  {
+    "block_id": 11,
+    "batch_id": "BATCH-DEMO-CC-2026-FINAL",
+    "timestamp": "2026-10-23T15:26:50.289384+00:00",
+    "certificate_count": 1,
+    "merkle_root": "429ff2e2d1514c4335ddd49674da4c75b56289c97f41a0c5e0309ce5734f5701",
+    "previous_root": "6eb945c10492cc0c405a2e1b7337938d6065b45474d3f1e568cb4671d6293f82",
+    "block_hash": "db67c1f8e52b23771fcc62c47f436662f2182f303c6ca284bc3fef16002b001a",
+    "chain_spec_version": "1.0"
+  },
+  {
+    "block_id": 12,
+    "batch_id": "BATCH-CERT001",
+    "timestamp": "2026-10-23T15:31:19.679297+00:00",
+    "certificate_count": 1,
+    "merkle_root": "16f64001e6cf44ede21b748c165440435b010b947e8871bd41b438ae5d69724e",
+    "previous_root": "429ff2e2d1514c4335ddd49674da4c75b56289c97f41a0c5e0309ce5734f5701",
+    "block_hash": "767f93dacca0faa59db7217fc3a7b7bbe034723e8a1fae5c1926be0deda72941",
+    "chain_spec_version": "1.0"
+  },
+  {
+    "block_id": 13,
+    "batch_id": "BATCH-CERT002",
+    "timestamp": "2026-10-23T15:41:17.787011+00:00",
+    "certificate_count": 1,
+    "merkle_root": "ccd82d4f084a6e557d8ec90f632bbf18eae00bdcbe0d827209224b3698b5ca90",
+    "previous_root": "16f64001e6cf44ede21b748c165440435b010b947e8871bd41b438ae5d69724e",
+    "block_hash": "e560a83adfcd07f0f704a118eddeb095a2b581d153e7e68800d0faa54e001be1",
+    "chain_spec_version": "1.0"
   }
 ]

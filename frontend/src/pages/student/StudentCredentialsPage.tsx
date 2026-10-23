@@ -22,18 +22,10 @@ export const StudentCredentialsPage: React.FC = () => {
 
   useEffect(() => {
     credentialService.getAll().then((data) => {
-      const identityName = (currentUser?.name ?? '').trim().toLowerCase();
-      const identityEmail = (currentUser?.email ?? '').trim().toLowerCase();
-
-      const studentCreds = identityEmail || identityName
-        ? data.filter((c) => {
-            const nameMatch = (c.studentName ?? '').trim().toLowerCase() === identityName;
-            const emailMatch = (c.studentEmail ?? '').trim().toLowerCase() === identityEmail;
-            return nameMatch || emailMatch;
-          })
-        : data;
-
-      setCredentials(studentCreds);
+      setCredentials(data);
+      setLoading(false);
+    }).catch(() => {
+      setCredentials([]);
       setLoading(false);
     });
   }, [currentUser?.email, currentUser?.name]);

@@ -21,8 +21,9 @@ export const InstitutionLoginPage: React.FC = () => {
     try {
       await authService.loginInstitution(email, password);
       navigate('/institution/dashboard');
-    } catch {
-      setError('Unable to authenticate with registrar registry. Please verify your credentials.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to authenticate with registrar registry. Please verify your credentials.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

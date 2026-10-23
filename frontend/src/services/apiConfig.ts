@@ -40,6 +40,7 @@ export async function apiRequest<T>(endpoint: string, options: RequestInit = {})
     try {
       const parsedJson = JSON.parse(errorBody);
       if (parsedJson.message) message = parsedJson.message;
+      else if (parsedJson.error) message = parsedJson.error;
     } catch {
       // Keep default message
     }

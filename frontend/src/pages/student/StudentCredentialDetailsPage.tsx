@@ -24,6 +24,9 @@ export const StudentCredentialDetailsPage: React.FC = () => {
     credentialService.getById(id).then((res) => {
       setCredential(res);
       setLoading(false);
+    }).catch(() => {
+      setCredential(null);
+      setLoading(false);
     });
   }, [id]);
 

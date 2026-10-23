@@ -104,39 +104,39 @@ export const BulkIssuancePage: React.FC = () => {
     setHasErrors(false);
   };
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleStartProcessing = async () => {
     if (!conferralConfirmed) return;
     setIsProcessing(true);
-    setProgress(0);
+    setErrorMessage(null);
+    setProgress(20);
 
-    // Simulate batch progress bar
-    const interval = setInterval(() => {
-      setProgress((old) => {
-        if (old >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return old + 20;
+    try {
+      const result = await credentialService.processBulkIssuance({
+        batchId: `BATCH-2024-COHORT-${Math.floor(100 + Math.random() * 900)}`,
+        fileName,
+        totalRecords: records.length,
+        validRecords: records.filter((r) => r.status === 'VALID').length,
+        errorRecords: records.filter((r) => r.status === 'ERROR').length,
+        duplicateRecords: records.filter((r) => r.status === 'DUPLICATE').length,
+        status: 'COMPLETED',
+        records,
+        createdAt: new Date().toISOString()
       });
-    }, 250);
-
-    const result = await credentialService.processBulkIssuance({
-      batchId: `BATCH-2024-COHORT-${Math.floor(100 + Math.random() * 900)}`,
-      fileName,
-      totalRecords: records.length,
-      validRecords: records.filter((r) => r.status === 'VALID').length,
-      errorRecords: records.filter((r) => r.status === 'ERROR').length,
-      duplicateRecords: records.filter((r) => r.status === 'DUPLICATE').length,
-      status: 'COMPLETED',
-      records,
-      createdAt: new Date().toISOString()
-    });
-
-    clearInterval(interval);
-    setProgress(100);
-    setIsProcessing(false);
-    setIsCompleted(true);
-    setIssuedBatchId(result.batchId);
+      setProgress(100);
+      setIsCompleted(true);
+      setIssuedBatchId(result.batchId);
+    } catch (err: unknown) {
+      setProgress(0);
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : 'Bulk issuance is not currently supported by the backend API. Please use individual Certificate Registration.'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const totalRecords = records.length;
@@ -170,6 +170,24 @@ export const BulkIssuancePage: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Backend Capability Notice */}
+      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
+        <span className="material-symbols-outlined text-[20px] text-amber-700 shrink-0 mt-0.5">info</span>
+        <div>
+          <span className="font-bold block">Backend Feature Status: Individual Registration Active</span>
+          <span>
+            Automated batch upload is planned for an upcoming release. To issue official tamper-evident credentials in the current version, please use individual certificate registration from the Registrar Dashboard.
+          </span>
+        </div>
+      </div>
+
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+          <span className="material-symbols-outlined text-[18px]">error</span>
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       {/* Stepper Navigation */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-sm" id="stepperNav">
