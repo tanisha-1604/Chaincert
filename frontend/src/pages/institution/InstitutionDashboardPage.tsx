@@ -9,28 +9,44 @@ export const InstitutionDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [history, setHistory] = useState<VerificationHistoryItem[]>([]);
+  const [stats, setStats] = useState({
+    totalRegistered: 0,
+    issuedCredentials: 0,
+    validCredentials: 0,
+    revokedCredentials: 0,
+    reviewRequired: 0,
+  });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [creds, hist] = await Promise.all([
-          credentialService.getAll(),
-          auditService.getVerificationHistory()
-        ]);
-        setCredentials(creds);
-        setHistory(hist);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    try {
+      const [creds, hist, liveStats] = await Promise.all([
+        credentialService.getAll(),
+        auditService.getVerificationHistory(),
+        credentialService.getInstitutionStats(),
+      ]);
+      setCredentials(creds);
+      setHistory(hist);
+      setStats(liveStats);
+    } catch (e) {
+      console.error('Failed to load dashboard data:', e);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
+    const unsubscribe = credentialService.subscribe(() => {
+      loadData();
+    });
+    return unsubscribe;
   }, []);
 
-  const totalRegistered = credentials.length;
-  const issuedCredentials = credentials.length;
-  const activeCredentials = credentials.filter(c => c.status === 'ACTIVE').length;
-  const revokedCredentials = credentials.filter(c => c.status === 'REVOKED').length;
+  const totalRegistered = stats.totalRegistered;
+  const issuedCredentials = stats.issuedCredentials;
+  const activeCredentials = stats.validCredentials;
+  const revokedCredentials = stats.revokedCredentials;
 
   if (loading) {
     return (

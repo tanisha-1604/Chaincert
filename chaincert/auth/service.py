@@ -17,7 +17,7 @@ class AccessControlService:
  def create_institution(self,name:str)->int:
   if not isinstance(name,str) or not name.strip(): raise ValueError("Institution name required")
   with self.store.connect() as c: return int(c.execute("INSERT INTO institutions(name) VALUES(?)",(name.strip(),)).lastrowid)
- def provision_user(self,*,email,display_name,password,role:Role,institution_id=None,actor:User|None=None)->int:
+ def provision_user(self,*,email,display_name,password,role:Role,institution_id=None,actor:User|None=None,roll_number:str|None=None)->int:
   if not isinstance(email,str) or "@" not in email or len(email)>254: raise ValueError("Valid email required")
   if not isinstance(display_name,str) or not display_name.strip(): raise ValueError("Display name required")
   if not isinstance(role,Role): raise ValueError("role must be Role enum")
@@ -36,8 +36,13 @@ class AccessControlService:
    if institution_id is not None:
     inst=c.execute("SELECT active FROM institutions WHERE id=?",(institution_id,)).fetchone()
     if not inst or not inst["active"]: raise ValueError("Institution missing or inactive")
-   cur=c.execute("INSERT INTO users(email,display_name,password_hash,role,institution_id) VALUES(?,?,?,?,?)",
-    (email.strip().lower(),display_name.strip(),hash_password(password),role.value,institution_id))
+   cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+   if "roll_number" in cols:
+    cur=c.execute("INSERT INTO users(email,display_name,password_hash,role,institution_id,roll_number) VALUES(?,?,?,?,?,?)",
+     (email.strip().lower(),display_name.strip(),hash_password(password),role.value,institution_id,roll_number.strip() if roll_number else None))
+   else:
+    cur=c.execute("INSERT INTO users(email,display_name,password_hash,role,institution_id) VALUES(?,?,?,?,?)",
+     (email.strip().lower(),display_name.strip(),hash_password(password),role.value,institution_id))
    uid=int(cur.lastrowid); self._audit(c,actor.id if actor else None,"USER_PROVISIONED","user",str(uid),institution_id,"SUCCESS",{"role":role.value})
    return uid
  @staticmethod
@@ -170,10 +175,16 @@ class AccessControlService:
   try: payload=self.serializer.loads(token,max_age=self.max_age)
   except (BadSignature,SignatureExpired): raise AuthenticationError("Invalid or expired token") from None
   with self.store.connect() as c:
-   row=c.execute("SELECT s.token_id,s.user_id,s.expires_at,s.revoked,u.id,u.email,u.display_name,u.role,u.institution_id,u.active FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_id=? AND s.user_id=?",(payload.get("sid"),payload.get("uid"))).fetchone()
+   cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+   has_roll = "roll_number" in cols
+   query = ("SELECT s.token_id,s.user_id,s.expires_at,s.revoked,u.id,u.email,u.display_name,u.role,u.institution_id,u.active"
+            + (",u.roll_number" if has_roll else "")
+            + " FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_id=? AND s.user_id=?")
+   row=c.execute(query,(payload.get("sid"),payload.get("uid"))).fetchone()
    if not row or row["revoked"] or row["expires_at"]<int(time.time()): raise AuthenticationError("Session invalid, expired, or logged out")
    if not row["active"]: raise AuthenticationError("Account inactive")
-   return User(row["id"],row["email"],row["display_name"],Role(row["role"]),row["institution_id"],bool(row["active"]))
+   roll = row["roll_number"] if has_roll and "roll_number" in row.keys() else None
+   return User(row["id"],row["email"],row["display_name"],Role(row["role"]),row["institution_id"],bool(row["active"]),roll)
  def logout(self,token):
   user=self.authenticate(token); payload=self.serializer.loads(token,max_age=self.max_age)
   with self.store.connect() as c:

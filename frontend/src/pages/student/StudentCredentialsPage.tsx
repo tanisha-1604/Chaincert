@@ -20,7 +20,7 @@ export const StudentCredentialsPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  useEffect(() => {
+  const loadData = () => {
     credentialService.getAll().then((data) => {
       setCredentials(data);
       setLoading(false);
@@ -28,12 +28,28 @@ export const StudentCredentialsPage: React.FC = () => {
       setCredentials([]);
       setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadData();
+    const unsubscribe = credentialService.subscribe(() => {
+      loadData();
+    });
+    return unsubscribe;
   }, [currentUser?.email, currentUser?.name]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     showToast(`Credential ID ${text} copied to clipboard!`);
   };
+
+  const initials = (currentUser?.name || 'ST')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   const filtered = credentials.filter((c) => {
     const q = search.toLowerCase();
@@ -93,23 +109,29 @@ export const StudentCredentialsPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div className="flex items-start sm:items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-primary-container text-on-primary flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
-              AP
+              {initials}
             </div>
             <div className="flex flex-col">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-bold text-primary tracking-tight">
-                  {currentUser?.name || 'Ananya Patil'}
+                  {currentUser?.name || 'Student'}
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary text-xs font-semibold">
-                  ID: {currentUser?.studentId || 'STU-2024-89042'}
-                </span>
+                {currentUser?.studentId ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary text-xs font-semibold font-mono">
+                    Roll: {currentUser.studentId}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary text-xs font-semibold">
+                    {currentUser?.email}
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm font-medium text-slate-800 mt-0.5">
-                Bachelor of Technology in Artificial Intelligence
+                {credentials[0]?.course || 'Enrolled Academic Program'}
               </p>
               <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mt-1">
                 <span className="material-symbols-outlined text-[16px]">school</span>
-                <span>Westminster State University</span>
+                <span>{credentials[0]?.institution || 'MMCOE'}</span>
               </div>
             </div>
           </div>

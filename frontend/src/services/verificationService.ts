@@ -24,6 +24,7 @@ interface BackendVerifyResponse {
   sha256?: string;
   merkle_root?: string;
   mismatched_fields?: string[];
+  mismatches?: Record<string, { expected: string; actual: string }>;
   extraction?: Record<string, unknown>;
   integrity_details?: Record<string, unknown>;
 }
@@ -65,14 +66,14 @@ function buildDefaultChecks(state: VerificationState, mismatchedFields: string[]
   const checks: VerificationCheck[] = [];
   if (state === 'GENUINE') {
     checks.push(
-      { name: 'Registry Lookup', passed: true, message: 'Record found in institutional registry' },
-      { name: 'Hash Verification', passed: true, message: 'SHA-256 canonical hash matches trusted archive' },
-      { name: 'Active Status', passed: true, message: 'Credential is active and unrevoked' },
+      { name: 'Certificate Found', passed: true, message: 'Record found in institutional registry' },
+      { name: 'All Required Fields Matched', passed: true, message: 'Extracted certificate fields match registered record' },
+      { name: 'Cryptographic Verification Passed', passed: true, message: 'SHA-256 canonical hash matches trusted archive' },
     );
   } else if (state === 'TAMPERED') {
     checks.push(
       { name: 'Registry Lookup', passed: true, message: 'Record found in institutional registry' },
-      { name: 'Field Comparison', passed: false, message: `Mismatched fields: ${mismatchedFields.join(', ') || 'unknown'}` },
+      { name: 'Field Comparison', passed: false, message: `Mismatched fields: ${mismatchedFields.join(', ') || 'discrepancy detected'}` },
     );
   } else if (state === 'REVOKED') {
     checks.push(
@@ -96,11 +97,11 @@ function buildResult(data: BackendVerifyResponse, channel: VerificationResult['c
   const certId = data.certificate_id || data.certificate?.certificate_id || 'UNKNOWN';
 
   const summaryMap: Record<VerificationState, string> = {
-    GENUINE: 'This credential is registered with the issuing institution and details match the trusted record.',
-    TAMPERED: 'The submitted credential does not match the trusted record. Field mismatch detected.',
-    REVOKED: 'This credential was previously registered but has been revoked by the issuing institution.',
-    REVIEW_REQUIRED: 'The credential could not be conclusively verified automatically and requires further review.',
-    NOT_FOUND: 'No matching credential record was found.',
+    GENUINE: 'Certificate verified successfully. All required fields match the registered academic credential.',
+    TAMPERED: 'Certificate data does not match the trusted registry. Field mismatch detected.',
+    REVOKED: 'This certificate was previously issued but has been revoked by the issuing institution.',
+    REVIEW_REQUIRED: 'The document could not be reliably extracted. Secondary review required.',
+    NOT_FOUND: 'No trusted certificate exists for this certificate ID.',
   };
 
   const checks = parseChecks(data.checks, state, data.mismatched_fields ?? []);
@@ -116,6 +117,10 @@ function buildResult(data: BackendVerifyResponse, channel: VerificationResult['c
     data.merkle_root ||
     '';
 
+  const missingList = (data.checks && typeof data.checks === 'object' && !Array.isArray(data.checks))
+    ? ((data.checks as any).missing_fields as string[] | undefined)
+    : undefined;
+
   const result: VerificationResult = {
     state,
     certificateId: certId,
@@ -124,9 +129,13 @@ function buildResult(data: BackendVerifyResponse, channel: VerificationResult['c
     detailedMessage: data.explanation ?? summaryMap[state],
     checks,
     channel,
+    mismatches: data.mismatches,
+    mismatchedFields: data.mismatched_fields,
+    missingFields: missingList,
+    extractionDetails: data.extraction,
   };
 
-  if (data.certificate && (state === 'GENUINE' || state === 'REVOKED')) {
+  if (data.certificate) {
     const c = data.certificate;
     result.credential = {
       id: c.certificate_id,

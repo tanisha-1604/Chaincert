@@ -115,69 +115,63 @@ def add_api_cors_headers(response):
 
 
 def ensure_default_accounts():
-    """Ensure baseline accounts and institutions exist in access_control.db if empty."""
+    """Ensure baseline accounts and institutions exist in access_control.db idempotently."""
     try:
         from chaincert.auth import Role
         access = app.extensions["chaincert_services"]["access"]
+        
         with access.store.connect() as con:
-            user_count = con.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
-            if user_count > 0:
-                return
             inst_row = con.execute("SELECT id FROM institutions WHERE name='MMCOE'").fetchone()
-            inst_id = inst_row["id"] if inst_row else access.create_institution("MMCOE")
+            admin_row = con.execute("SELECT id FROM users WHERE email='demo.admin@chaincert.local' COLLATE NOCASE").fetchone()
 
-        # Initial platform admin bootstrap
-        access.provision_user(
-            email="demo.admin@chaincert.local",
-            display_name="ChainCert Demo Admin",
-            password="ChainCertDemo!2026",
-            role=Role.PLATFORM_ADMIN,
-            institution_id=None,
-        )
+        if inst_row:
+            inst_id = inst_row["id"]
+        else:
+            inst_id = access.create_institution("MMCOE")
+
+        if not admin_row:
+            access.provision_user(
+                email="demo.admin@chaincert.local",
+                display_name="ChainCert Demo Admin",
+                password="ChainCertDemo!2026",
+                role=Role.PLATFORM_ADMIN,
+                institution_id=None,
+            )
+
         token = access.login("demo.admin@chaincert.local", "ChainCertDemo!2026")
         actor = access.authenticate(token)
 
-        # Baseline accounts documented in README & DEMO_RUNBOOK
-        access.provision_user(
-            email="institute@chaincert.local",
-            display_name="MMCOE Registrar",
-            password="Institute12345",
-            role=Role.INSTITUTION_ADMIN,
-            institution_id=inst_id,
-            actor=actor,
-        )
-        access.provision_user(
-            email="issuer@chaincert.local",
-            display_name="Demo Issuer",
-            password="IssuerDemo!2026",
-            role=Role.INSTITUTION_ADMIN,
-            institution_id=inst_id,
-            actor=actor,
-        )
-        access.provision_user(
-            email="student@chaincert.local",
-            display_name="Demo Student",
-            password="Student123456",
-            role=Role.STUDENT,
-            institution_id=inst_id,
-            actor=actor,
-        )
-        access.provision_user(
-            email="student@mmcoe.local",
-            display_name="Demo Student",
-            password="Student123456",
-            role=Role.STUDENT,
-            institution_id=inst_id,
-            actor=actor,
-        )
-        access.provision_user(
-            email="alice@chaincert.local",
-            display_name="Alice Example",
-            password="AliceExample123",
-            role=Role.STUDENT,
-            institution_id=inst_id,
-            actor=actor,
-        )
+        baseline_accounts = [
+            ("institute@chaincert.local", "MMCOE Registrar", "Institute12345", Role.INSTITUTION_ADMIN, None),
+            ("registrar@chaincert.local", "MMCOE Registrar", "Registrar123", Role.INSTITUTION_ADMIN, None),
+            ("issuer@chaincert.local", "Demo Issuer", "IssuerDemo!2026", Role.INSTITUTION_ADMIN, None),
+            ("student@chaincert.local", "Demo Student", "Student123456", Role.STUDENT, None),
+            ("student@mmcoe.local", "Demo Student", "Student123456", Role.STUDENT, None),
+            ("alice@chaincert.local", "Alice Example", "AliceExample123", Role.STUDENT, "DEMO-ROLL-001"),
+            ("robert.evans@chaincert.local", "Robert Evans", "RobertEvans123", Role.STUDENT, "DEMO-ROLL-ROBERT-001"),
+            ("priya.sharma@chaincert.local", "Priya Sharma", "PriyaStudent123", Role.STUDENT, "AD2026-001"),
+            ("neha.patil@chaincert.local", "Neha Patil", "NehaStudent123", Role.STUDENT, "AD2026-002"),
+        ]
+
+        for email, display_name, pwd, role, roll in baseline_accounts:
+            with access.store.connect() as con:
+                row = con.execute("SELECT id, roll_number FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+                has_roll = "roll_number" in {r["name"] for r in con.execute("PRAGMA table_info(users)").fetchall()}
+
+            if not row:
+                access.provision_user(
+                    email=email,
+                    display_name=display_name,
+                    password=pwd,
+                    role=role,
+                    institution_id=inst_id,
+                    actor=actor,
+                    roll_number=roll,
+                )
+            elif roll and has_roll and not row["roll_number"]:
+                with access.store.connect() as con:
+                    con.execute("UPDATE users SET roll_number=? WHERE id=?", (roll, row["id"]))
+
         access.logout(token)
     except Exception as exc:
         app.logger.warning("ensure_default_accounts skipped: %s", exc)

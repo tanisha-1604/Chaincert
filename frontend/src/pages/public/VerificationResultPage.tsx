@@ -197,54 +197,110 @@ export const VerificationResultPage: React.FC = () => {
       </div>
 
       {/* State-Specific Warning / Notice Banner */}
-      {result.state === 'NOT_FOUND' && (
-        <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-slate-900">
-            <span className="material-symbols-outlined text-slate-600 text-[20px]">info</span>
-            <span>Important Note Concerning Unfound Records</span>
+      {result.state === 'GENUINE' && (
+        <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-2">
+          <div className="flex items-center gap-2 font-bold text-emerald-950 text-sm">
+            <span className="material-symbols-outlined text-emerald-600 text-[20px]">verified</span>
+            <span>GENUINE — Certificate Verified Successfully</span>
           </div>
           <p className="leading-relaxed">
-            {result.detailedMessage}
+            All required fields matched the trusted institutional registry, and cryptographic verification (SHA-256 canonical hash & Merkle anchor) passed.
+          </p>
+        </div>
+      )}
+
+      {result.state === 'NOT_FOUND' && (
+        <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 space-y-2">
+          <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+            <span className="material-symbols-outlined text-slate-600 text-[20px]">search_off</span>
+            <span>NOT FOUND — No Trusted Certificate Exists</span>
+          </div>
+          <p className="leading-relaxed">
+            No trusted certificate record was found for Certificate ID: <strong className="font-mono">{result.certificateId}</strong>.
           </p>
           <p className="text-slate-600 text-[11px]">
-            Tip: Please double-check the Certificate ID against your official degree document or ask the conferring institution to verify that the diploma has been published to the digital registry.
+            Tip: Please double-check the Certificate ID or verify that the document has been published to the registry.
           </p>
         </div>
       )}
 
       {result.state === 'REVOKED' && (
         <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-rose-950">
+          <div className="flex items-center gap-2 font-bold text-rose-950 text-sm">
             <span className="material-symbols-outlined text-rose-600 text-[20px]">gavel</span>
-            <span>Official University Revocation Notice</span>
+            <span>REVOKED — This Certificate Was Revoked</span>
           </div>
           <p className="leading-relaxed">
             {result.detailedMessage}
           </p>
+          {result.credential?.revocationReason && (
+            <div className="p-2.5 bg-white/80 rounded-xl border border-rose-200 text-rose-900">
+              <strong>Reason:</strong> {result.credential.revocationReason}
+            </div>
+          )}
         </div>
       )}
 
       {result.state === 'REVIEW_REQUIRED' && (
         <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-amber-950">
+          <div className="flex items-center gap-2 font-bold text-amber-950 text-sm">
             <span className="material-symbols-outlined text-amber-600 text-[20px]">help</span>
-            <span>Secondary Human or Registrar Review Required</span>
+            <span>REVIEW REQUIRED — Document Could Not Be Reliably Extracted</span>
           </div>
           <p className="leading-relaxed">
             {result.detailedMessage}
           </p>
+          {result.missingFields && result.missingFields.length > 0 && (
+            <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200 text-amber-900">
+              <strong>Unresolved Fields:</strong> {result.missingFields.map(f => f.replace(/_/g, ' ')).join(', ')}
+            </div>
+          )}
         </div>
       )}
 
       {result.state === 'TAMPERED' && (
-        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-rose-950">
-            <span className="material-symbols-outlined text-rose-600 text-[20px]">warning</span>
-            <span>Cryptographic Integrity Alert</span>
+        <div className="p-5 rounded-2xl bg-rose-50 border border-rose-300 text-xs text-rose-900 space-y-3 shadow-xs">
+          <div className="flex items-center gap-2 font-bold text-rose-950 text-sm">
+            <span className="material-symbols-outlined text-rose-600 text-[22px]">warning</span>
+            <span>TAMPERED — Certificate Data Does Not Match Trusted Registry</span>
           </div>
           <p className="leading-relaxed">
             {result.detailedMessage}
           </p>
+
+          {/* Mismatched Fields Comparison Card */}
+          {result.mismatches && Object.keys(result.mismatches).length > 0 ? (
+            <div className="bg-white rounded-xl p-4 border border-rose-200 space-y-2.5">
+              <span className="font-bold text-rose-950 block text-xs uppercase tracking-wider">
+                Confirmed Mismatched Fields:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.entries(result.mismatches).map(([field, diff]) => (
+                  <div key={field} className="p-3 bg-rose-50/70 rounded-xl border border-rose-200 text-xs space-y-1">
+                    <span className="font-bold text-rose-900 uppercase tracking-wider text-[11px] block">
+                      Field: {field.replace(/_/g, ' ')}
+                    </span>
+                    <div className="flex justify-between items-center text-slate-700 pt-0.5">
+                      <span className="text-[11px] text-slate-500">Expected (Registry):</span>
+                      <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {diff.expected}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-700">
+                      <span className="text-[11px] text-slate-500">Uploaded (Document):</span>
+                      <span className="font-mono font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
+                        {diff.actual}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : result.mismatchedFields && result.mismatchedFields.length > 0 ? (
+            <div className="bg-white rounded-xl p-3 border border-rose-200 text-rose-900">
+              <strong>Mismatched Fields:</strong> {result.mismatchedFields.map(f => f.replace(/_/g, ' ')).join(', ')}
+            </div>
+          ) : null}
         </div>
       )}
 

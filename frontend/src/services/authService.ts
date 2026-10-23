@@ -9,6 +9,7 @@ interface BackendUser {
   display_name: string;
   role: string;
   institution_id: string | null;
+  roll_number?: string | null;
 }
 
 interface LoginResponse {
@@ -29,6 +30,7 @@ function mapBackendUser(bu: BackendUser, token: string): User {
     email: bu.email,
     role,
     institutionId: bu.institution_id ?? undefined,
+    studentId: bu.roll_number ?? undefined,
     token,
   };
 }

@@ -75,12 +75,16 @@ def init_db(db_path: Optional[str] = None) -> None:
         );
     """)
 
-    # Lightweight additive migration for Module 6 revocation metadata.
+    # Lightweight additive migration for Module 6 revocation metadata and student association.
     existing_columns = {row[1] for row in cursor.execute("PRAGMA table_info(certificates)").fetchall()}
     if "revocation_reason" not in existing_columns:
         cursor.execute("ALTER TABLE certificates ADD COLUMN revocation_reason TEXT")
     if "revoked_at" not in existing_columns:
         cursor.execute("ALTER TABLE certificates ADD COLUMN revoked_at TEXT")
+    if "student_user_id" not in existing_columns:
+        cursor.execute("ALTER TABLE certificates ADD COLUMN student_user_id INTEGER")
+    if "student_email" not in existing_columns:
+        cursor.execute("ALTER TABLE certificates ADD COLUMN student_email TEXT")
 
     conn.commit()
     conn.close()
@@ -111,11 +115,15 @@ def add_certificate(cert_data: Dict[str, Any], db_path: Optional[str] = None) ->
     conn = get_connection(db_path)
     cursor = conn.cursor()
 
+    student_user_id = cert_data.get("student_user_id")
+    student_email = cert_data.get("student_email")
+
     cursor.execute("""
         INSERT INTO certificates (
             certificate_id, student_name, roll_number, course, cgpa, issue_date,
-            institution_id, status, canonical_data, certificate_hash, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            institution_id, status, canonical_data, certificate_hash, created_at, updated_at,
+            student_user_id, student_email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         canonical_dict["certificate_id"],
         canonical_dict["student_name"],
@@ -128,7 +136,9 @@ def add_certificate(cert_data: Dict[str, Any], db_path: Optional[str] = None) ->
         hash_res.canonical_data,
         hash_res.certificate_hash,
         now,
-        now
+        now,
+        student_user_id,
+        student_email
     ))
 
     conn.commit()

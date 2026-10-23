@@ -74,6 +74,10 @@ export const CertificatesPage: React.FC = () => {
     if (searchParams.get('action') === 'register') {
       setIsRegisterOpen(true);
     }
+    const unsubscribe = credentialService.subscribe(() => {
+      loadData();
+    });
+    return unsubscribe;
   }, [searchParams]);
 
   // Open Details Drawer
@@ -437,6 +441,20 @@ export const CertificatesPage: React.FC = () => {
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-300 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-primary block mb-1">
+                  Student Email (Direct Portal Association)
+                </label>
+                <input
+                  id="regEmail"
+                  type="email"
+                  placeholder="e.g. robert.evans@chaincert.local"
+                  value={newCert.studentEmail}
+                  onChange={(e) => setNewCert({ ...newCert, studentEmail: e.target.value })}
+                  className="w-full h-10 px-3 rounded-xl bg-white border border-slate-300 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+                />
               </div>
 
               <div>

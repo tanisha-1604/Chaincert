@@ -24,5 +24,6 @@ class SQLiteStore:
    columns = {r["name"] for r in con.execute("PRAGMA table_info(users)").fetchall()}
    if "totp_secret" not in columns: con.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT")
    if "email_verified" not in columns: con.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0")
+   if "roll_number" not in columns: con.execute("ALTER TABLE users ADD COLUMN roll_number TEXT")
  def connect(self):
   con=sqlite3.connect(self.path,timeout=10); con.row_factory=sqlite3.Row; con.execute("PRAGMA foreign_keys=ON"); return con

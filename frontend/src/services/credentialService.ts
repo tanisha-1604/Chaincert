@@ -129,10 +129,29 @@ function getAuthenticatedInstitutionId(): string {
   return institutionId;
 }
 
+// Change notification listener for live updates across views
+type ChangeListener = () => void;
+const changeListeners = new Set<ChangeListener>();
+
+function notifyChange(): void {
+  changeListeners.forEach((cb) => {
+    try {
+      cb();
+    } catch (e) {
+      console.error('Error in credential change listener:', e);
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Credential service
 // ---------------------------------------------------------------------------
 export const credentialService = {
+  subscribe(listener: ChangeListener): () => void {
+    changeListeners.add(listener);
+    return () => changeListeners.delete(listener);
+  },
+
   async getAll(): Promise<Credential[]> {
     const raw = localStorage.getItem('chaincert_auth_user');
     let isStudent = false;
@@ -171,6 +190,73 @@ export const credentialService = {
     }
   },
 
+  async getInstitutionStats(): Promise<{
+    totalRegistered: number;
+    issuedCredentials: number;
+    validCredentials: number;
+    revokedCredentials: number;
+    reviewRequired: number;
+  }> {
+    try {
+      const res = await apiRequest<{
+        success: boolean;
+        total_registered: number;
+        issued_credentials: number;
+        valid_credentials: number;
+        revoked_credentials: number;
+        review_required: number;
+      }>('/institution/stats');
+      return {
+        totalRegistered: res.total_registered,
+        issuedCredentials: res.issued_credentials,
+        validCredentials: res.valid_credentials,
+        revokedCredentials: res.revoked_credentials,
+        reviewRequired: res.review_required,
+      };
+    } catch {
+      // Fallback calculation from getAll() if endpoint is temporarily unreachable
+      const creds = await this.getAll();
+      const total = creds.length;
+      const revoked = creds.filter(c => c.status === 'REVOKED').length;
+      return {
+        totalRegistered: total,
+        issuedCredentials: total,
+        validCredentials: total - revoked,
+        revokedCredentials: revoked,
+        reviewRequired: 0,
+      };
+    }
+  },
+
+  async getStudentStats(): Promise<{
+    totalCredentials: number;
+    validCredentials: number;
+    revokedCredentials: number;
+  }> {
+    try {
+      const res = await apiRequest<{
+        success: boolean;
+        total_credentials: number;
+        valid_credentials: number;
+        revoked_credentials: number;
+      }>('/students/me/stats');
+      return {
+        totalCredentials: res.total_credentials,
+        validCredentials: res.valid_credentials,
+        revokedCredentials: res.revoked_credentials,
+      };
+    } catch {
+      const creds = await this.getAll();
+      const total = creds.length;
+      const revoked = creds.filter(c => c.status === 'REVOKED').length;
+      return {
+        totalCredentials: total,
+        validCredentials: total - revoked,
+        revokedCredentials: revoked,
+      };
+    }
+  },
+
   // -------------------------------------------------------------------------
   // Register a new certificate
   //
@@ -182,6 +268,7 @@ export const credentialService = {
     id: string;
     studentName: string;
     studentRoll: string;
+    studentEmail?: string;
     course: string;
     issueDate: string;
 
@@ -199,6 +286,7 @@ export const credentialService = {
         certificate_id: newCred.id.trim(),
         student_name: newCred.studentName.trim(),
         roll_number: newCred.studentRoll.trim(),
+        student_email: newCred.studentEmail ? newCred.studentEmail.trim() : undefined,
         course: newCred.course.trim(),
         cgpa: (newCred.cgpa && newCred.cgpa.trim()) ? newCred.cgpa.trim() : '9.80',
         issue_date: newCred.issueDate.trim(),
@@ -223,6 +311,7 @@ export const credentialService = {
       }
     );
 
+    notifyChange();
     return mapCert(data.certificate);
   },
 
@@ -245,6 +334,7 @@ export const credentialService = {
       throw new Error('Certificate not found after revoke');
     }
 
+    notifyChange();
     return updated;
   },
 

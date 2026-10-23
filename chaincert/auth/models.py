@@ -23,3 +23,4 @@ class User:
  role:Role
  institution_id:int|None
  active:bool
+ roll_number:str|None=None

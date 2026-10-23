@@ -19,8 +19,11 @@ class VerificationResult:
     submitted_fingerprint: str | None = None
     trusted_fingerprint: str | None = None
     integrity_details: dict[str, Any] | None = None
+    mismatches: dict[str, dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["status"] = self.status.value
+        if result.get("mismatches") is None:
+            result["mismatches"] = {}
         return result

@@ -10,12 +10,17 @@ from chaincert.hashing.models import CANONICAL_FIELD_ORDER
 
 
 SUPPORTED_DATE_FORMATS = [
-    "%Y-%m-%d",      # 2026-08-20
-    "%d/%m/%Y",      # 20/08/2026
-    "%d-%m-%Y",      # 20-08-2026
-    "%Y/%m/%d",      # 2026/08/20
-    "%B %d, %Y",     # August 20, 2026
-    "%b %d, %Y",     # Aug 20, 2026
+    "%Y-%m-%d",      # 2026-10-23
+    "%d/%m/%Y",      # 23/10/2026
+    "%d-%m-%Y",      # 23-10-2026
+    "%d.%m.%Y",      # 23.10.2026
+    "%Y/%m/%d",      # 2026/10/23
+    "%d %b %Y",      # 23 Oct 2026
+    "%d %B %Y",      # 23 October 2026
+    "%B %d, %Y",     # October 23, 2026
+    "%b %d, %Y",     # Oct 23, 2026
+    "%d-%b-%Y",      # 23-Oct-2026
+    "%d-%B-%Y",      # 23-October-2026
 ]
 
 
@@ -28,7 +33,7 @@ def validate_cgpa(cgpa_input: Any) -> float:
         raise CertificateValidationError("CGPA field cannot be null or empty.")
 
     try:
-        val = float(str(cgpa_input).strip())
+        val = float(str(cgpa_input).strip().replace(",", "."))
     except (ValueError, TypeError):
         raise CertificateValidationError(f"Invalid CGPA value '{cgpa_input}'. Must be numeric.")
 
@@ -47,16 +52,19 @@ def parse_and_validate_date(date_input: Any) -> str:
         raise CertificateValidationError("issue_date field cannot be null or empty.")
 
     date_str = str(date_input).strip()
-    
+    # Strip ordinal suffixes: 23rd -> 23, 1st -> 1, etc.
+    cleaned_date = re.sub(r"(\d{1,2})(st|nd|rd|th)\b", r"\1", date_str, flags=re.IGNORECASE)
+    cleaned_date = re.sub(r"\s+", " ", cleaned_date).strip()
+
     for fmt in SUPPORTED_DATE_FORMATS:
         try:
-            parsed_dt = datetime.strptime(date_str, fmt)
+            parsed_dt = datetime.strptime(cleaned_date, fmt)
             return parsed_dt.strftime("%Y-%m-%d")
         except ValueError:
             continue
 
     raise CertificateValidationError(
-        f"Invalid or unsupported date format '{date_str}'. Expected formats include YYYY-MM-DD, DD/MM/YYYY, etc."
+        f"Invalid or unsupported date format '{date_str}'. Expected formats include YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, etc."
     )
 
 

@@ -75,6 +75,10 @@ export interface VerificationResult {
     batchId: string;
     leafIndex: number;
   };
+  mismatches?: Record<string, { expected: string; actual: string }>;
+  mismatchedFields?: string[];
+  missingFields?: string[];
+  extractionDetails?: Record<string, any>;
 }
 
 export interface AuditEvent {
